@@ -1,0 +1,44 @@
+﻿telegram:
+  bot_token: "YOUR_TELEGRAM_BOT_TOKEN"
+  chat_id: "YOUR_CHAT_ID"
+
+app:
+  # 서버 시스템 시간이 UTC여도, 알림 시각 계산은 이 타임존 기준으로 동작
+  timezone: "Asia/Seoul"
+  state_path: "./data/state.yaml"
+  # 예매 오픈 시각이 지난 이벤트를 며칠까지 상태 파일에 유지할지
+  retention_days: 3
+
+keywords:
+  - "아이유"
+  - "뮤지컬"
+  - "연극"
+
+schedules:
+  # mode=run(내장 스케줄러)에서만 사용
+  daily_registration_check:
+    hour: 9
+    minute: 0
+  # mode=run(내장 스케줄러)에서만 사용
+  reminder_poll_interval_minutes: 10
+
+reminders:
+  one_day_before:
+    enabled: true
+    send_at_hour: 20
+    send_at_minute: 0
+  same_day_morning:
+    enabled: true
+    send_at_hour: 8
+    send_at_minute: 0
+  one_hour_before:
+    enabled: true
+
+sources:
+  - type: "nolticket"
+    enabled: true
+    url: "https://tickets.interpark.com/contents/notice"
+
+  - type: "melonticket"
+    enabled: true
+    url: "https://ticket.melon.com/csoon/index.htm"
