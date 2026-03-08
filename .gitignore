@@ -1,5 +1,16 @@
-﻿.venv/
+﻿# Python env and cache
+.venv/
 __pycache__/
 *.pyc
-data/
+.pytest_cache/
+
+# Local runtime state/config (do not deploy)
 config.yaml
+data/
+*.log
+
+# Local editor/system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
