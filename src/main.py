@@ -7,11 +7,11 @@ from ticket_alarm import TicketAlarmService, load_config
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ticker radar telegram alarm")
+    parser = argparse.ArgumentParser(description="Ticket radar telegram alarm")
     parser.add_argument("--config", default="config.yaml", help="YAML config path")
     parser.add_argument(
         "--mode",
-        choices=["run", "daily-once", "reminder-once"],
+        choices=["run", "new-alert-once", "preopen-alert-once"],
         default="run",
         help="run scheduler or execute one-shot jobs",
     )
@@ -25,11 +25,11 @@ def main() -> None:
     config = load_config(args.config)
     service = TicketAlarmService(config)
 
-    if args.mode == "daily-once":
-        service.run_daily_registration_check()
+    if args.mode == "new-alert-once":
+        service.run_new_show_alert_check()
         return
-    if args.mode == "reminder-once":
-        service.run_reminder_check()
+    if args.mode == "preopen-alert-once":
+        service.run_preopen_alert_check()
         return
 
     service.run()
@@ -37,4 +37,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

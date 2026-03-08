@@ -57,18 +57,24 @@ python scripts/run.py
 ```
 
 ### 2) 단발 실행
+- 신규(새 공연) 알림 1회 실행
 ```bash
-python src/main.py --config config.yaml --mode daily-once
-python src/main.py --config config.yaml --mode reminder-once
+python src/main.py --config config.yaml --mode new-alert-once
+```
+- 예매 직전 알림 1회 실행
+```bash
+python src/main.py --config config.yaml --mode preopen-alert-once
 ```
 
 ## cron 운영 (권장)
 
-요청하신 방식대로, cron에는 단일 스크립트만 등록합니다.
-스크립트 내부에서 실제 파이썬 경로를 사용하고 현재 시각을 보고 실행 모드를 결정합니다.
+cron은 실행 시각만 결정합니다.
+스크립트는 실행될 때마다 항상 아래 두 작업을 순서대로 모두 수행합니다.
+- `new-alert-once`
+- `preopen-alert-once`
 
 - 스크립트: `scripts/cron_hourly.py`
-- 기본 정책: 매시 `00`분에 `daily-once` + `reminder-once` 둘 다 실행
+- 로그: `logs/cron_hourly.log` (스크립트 내부에서 누적 기록)
 
 ### 1) 서버 파이썬 경로 설정
 `scripts/cron_hourly.py`의 아래 상수를 서버 환경에 맞게 수정:
@@ -77,9 +83,13 @@ python src/main.py --config config.yaml --mode reminder-once
 TARGET_PYTHON = "/usr/bin/python3"
 ```
 
-### 2) crontab 등록`r`n(로그는 `logs/cron_hourly.log`에 스크립트가 직접 기록)
+### 2) crontab 등록
+원하는 시각은 crontab에서 결정:
+
 ```cron
 0 * * * * cd /path/to/ticket_radar && python scripts/cron_hourly.py
+# 예: 매시 30분이면
+# 30 * * * * cd /path/to/ticket_radar && python scripts/cron_hourly.py
 ```
 
 ## 알림 규칙
@@ -96,5 +106,3 @@ TARGET_PYTHON = "/usr/bin/python3"
 ## 주의
 - 사이트 DOM/API 변경 시 파서 업데이트 필요
 - 사이트 이용약관/robots 정책 확인 후 사용
-
-

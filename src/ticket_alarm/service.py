@@ -30,27 +30,27 @@ class TicketAlarmService:
 
         scheduler = BlockingScheduler(timezone=self.config.timezone)
         scheduler.add_job(
-            self.run_daily_registration_check,
+            self.run_new_show_alert_check,
             "cron",
             hour=daily_hour,
             minute=daily_minute,
-            id="daily-registration-check",
+            id="new-show-alert-check",
             replace_existing=True,
         )
         scheduler.add_job(
-            self.run_reminder_check,
+            self.run_preopen_alert_check,
             "interval",
             minutes=poll_minutes,
-            id="booking-reminder-check",
+            id="preopen-alert-check",
             replace_existing=True,
         )
 
         logger.info("Scheduler started (daily=%02d:%02d, reminder interval=%dm)", daily_hour, daily_minute, poll_minutes)
-        self.run_reminder_check()
+        self.run_preopen_alert_check()
         scheduler.start()
 
-    def run_daily_registration_check(self) -> None:
-        logger.info("Running daily registration check")
+    def run_new_show_alert_check(self) -> None:
+        logger.info("Running new-show alert check")
         now = datetime.now(tz=self.zone)
         self.repo.cleanup_expired(now)
 
@@ -68,8 +68,8 @@ class TicketAlarmService:
 
         logger.info("Sent %d new-event alerts", len(new_items))
 
-    def run_reminder_check(self) -> None:
-        logger.info("Running reminder check")
+    def run_preopen_alert_check(self) -> None:
+        logger.info("Running preopen alert check")
         now = datetime.now(tz=self.zone)
         self.repo.cleanup_expired(now)
         events = self.repo.list_events()
@@ -224,4 +224,13 @@ class TicketAlarmService:
             )
 
         return checks
+
+
+
+    # Backward-compatible aliases
+    def run_daily_registration_check(self) -> None:
+        self.run_new_show_alert_check()
+
+    def run_reminder_check(self) -> None:
+        self.run_preopen_alert_check()
 

@@ -9,23 +9,11 @@ from pathlib import Path
 # Change this path to match your server environment.
 TARGET_PYTHON = '/home/azureuser/miniconda3/envs/py311/bin/python'
 
-# Fixed policy: run both jobs when minute == 00.
-TOP_OF_HOUR_MINUTE = 0
-
-# Optional behavior when executed at non-top-of-hour times.
-# Keep False for strict hourly runs.
-RUN_REMINDER_WHEN_NOT_TOP_OF_HOUR = False
-
 # Internal log file path (relative to repository root).
 LOG_FILE_RELATIVE = "logs/cron_hourly.log"
 
-
-def _modes_for_now(now: datetime) -> list[str]:
-    if now.minute == TOP_OF_HOUR_MINUTE:
-        return ["daily-once", "reminder-once"]
-    if RUN_REMINDER_WHEN_NOT_TOP_OF_HOUR:
-        return ["reminder-once"]
-    return []
+# Always run both jobs. Execution time is controlled by crontab.
+MODES = ["new-alert-once", "preopen-alert-once"]
 
 
 def _write_log(log_file: Path, message: str) -> None:
@@ -61,15 +49,8 @@ def main() -> int:
     log_file = root / LOG_FILE_RELATIVE
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
-    now = datetime.now()
-    modes = _modes_for_now(now)
-
-    if not modes:
-        _write_log(log_file, f"no job scheduled for this minute ({now.minute:02d})")
-        return 0
-
-    _write_log(log_file, f"running modes: {', '.join(modes)}")
-    for mode in modes:
+    _write_log(log_file, f"running modes: {', '.join(MODES)}")
+    for mode in MODES:
         _run_mode(TARGET_PYTHON, main_script, config_path, mode, log_file)
 
     return 0
