@@ -1,6 +1,8 @@
 ﻿from __future__ import annotations
 
+import logging
 import re
+import time
 from urllib.parse import urljoin
 
 import requests
@@ -9,6 +11,8 @@ from bs4 import BeautifulSoup
 from ..models import ShowEvent
 from .base import SourceAdapter
 from .parsing import parse_korean_datetime
+
+logger = logging.getLogger(__name__)
 
 
 class MelonTicketAdapter(SourceAdapter):
@@ -20,6 +24,7 @@ class MelonTicketAdapter(SourceAdapter):
     DATE_SUFFIX_RE = re.compile(r"\s*\[오픈\]\s*\d{2}\.\d{2}\.\d{2}\([^)]*\)\s*$")
     SCHEDULE_SUFFIX_RE = re.compile(r"\s*오픈일정\s*보기\s*>\s*$")
     PROD_ID_RE = re.compile(r"bannerLanding\(\s*['\"]TD['\"]\s*,\s*['\"](\d+)['\"]\s*\)")
+    BLOCKED_STATUSES = {423, 429, 500, 502, 503, 504}
 
     def __init__(self, timezone_name: str, source_cfg: dict | None = None):
         self.timezone_name = timezone_name
@@ -27,10 +32,15 @@ class MelonTicketAdapter(SourceAdapter):
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Connection": "keep-alive",
             }
         )
         self._venue_cache: dict[str, str] = {}
+        self.request_retries = int(self.source_cfg.get("request_retries", 4))
+        self.retry_backoff_seconds = float(self.source_cfg.get("retry_backoff_seconds", 1.2))
 
     def fetch_events(self) -> list[ShowEvent]:
         max_pages = int(self.source_cfg.get("max_pages", 10))
@@ -84,13 +94,25 @@ class MelonTicketAdapter(SourceAdapter):
         return events
 
     def _load_form_params(self, url: str) -> dict[str, str]:
-        resp = self.session.get(url, timeout=20)
-        resp.raise_for_status()
+        default_params = {"orderType": "0", "pageIndex": "1", "schGcode": "GENRE_ALL", "schText": ""}
+
+        # Warm up cookie/session first; this sometimes reduces 423 responses.
+        try:
+            self._request_with_retries("GET", "https://ticket.melon.com/", timeout=20)
+        except Exception:
+            pass
+
+        resp = self._request_with_retries("GET", url, timeout=20)
+        if resp is None or resp.status_code >= 400:
+            code = resp.status_code if resp is not None else "N/A"
+            logger.warning("Melon index fetch unavailable (status=%s). Fallback to default form params.", code)
+            return default_params
 
         soup = BeautifulSoup(resp.text, "html.parser")
         form = soup.select_one("form#sForm")
         if form is None:
-            return {"orderType": "0", "pageIndex": "1", "schGcode": "GENRE_ALL", "schText": ""}
+            logger.warning("Melon index loaded but form#sForm not found. Using default form params.")
+            return default_params
 
         params: dict[str, str] = {}
         for el in form.select("input[name], select[name], textarea[name]"):
@@ -115,7 +137,8 @@ class MelonTicketAdapter(SourceAdapter):
         data = dict(form_params)
         data["pageIndex"] = str(page_idx)
 
-        resp = self.session.post(
+        resp = self._request_with_retries(
+            "POST",
             self.LIST_AJAX_URL,
             data=data,
             timeout=20,
@@ -123,16 +146,22 @@ class MelonTicketAdapter(SourceAdapter):
                 "X-Requested-With": "XMLHttpRequest",
                 "Referer": url,
                 "Origin": "https://ticket.melon.com",
+                "Accept": "*/*",
             },
         )
-        if resp.status_code >= 400:
+
+        if resp is None or resp.status_code >= 400:
+            code = resp.status_code if resp is not None else "N/A"
+            logger.warning("Melon list fragment unavailable (pageIndex=%s, status=%s)", page_idx, code)
             return ""
         return resp.text
 
     def _fetch_detail_text_and_prod_id(self, detail_url: str) -> tuple[str, str | None]:
         try:
-            resp = self.session.get(detail_url, timeout=20)
-            resp.raise_for_status()
+            resp = self._request_with_retries("GET", detail_url, timeout=20)
+            if resp is None or resp.status_code >= 400:
+                return "", None
+
             html = resp.text
             soup = BeautifulSoup(html, "html.parser")
             text = soup.get_text(" ", strip=True)
@@ -150,8 +179,11 @@ class MelonTicketAdapter(SourceAdapter):
         venue = ""
         try:
             url = self.PERFORMANCE_URL.format(prod_id=prod_id)
-            resp = self.session.get(url, timeout=20)
-            resp.raise_for_status()
+            resp = self._request_with_retries("GET", url, timeout=20)
+            if resp is None or resp.status_code >= 400:
+                self._venue_cache[prod_id] = ""
+                return ""
+
             soup = BeautifulSoup(resp.text, "html.parser")
 
             place = self._clean_text(self._first_text(soup, ["span.place", "p.place", "li.place"]))
@@ -166,6 +198,39 @@ class MelonTicketAdapter(SourceAdapter):
 
         self._venue_cache[prod_id] = venue
         return venue
+
+    def _request_with_retries(self, method: str, url: str, **kwargs) -> requests.Response | None:
+        last_resp: requests.Response | None = None
+
+        for attempt in range(1, self.request_retries + 1):
+            try:
+                resp = self.session.request(method, url, **kwargs)
+                last_resp = resp
+
+                if resp.status_code not in self.BLOCKED_STATUSES:
+                    return resp
+
+                logger.warning(
+                    "Melon request blocked (status=%s, attempt=%s/%s): %s",
+                    resp.status_code,
+                    attempt,
+                    self.request_retries,
+                    url,
+                )
+            except requests.RequestException as exc:
+                logger.warning(
+                    "Melon request error (attempt=%s/%s): %s (%s)",
+                    attempt,
+                    self.request_retries,
+                    url,
+                    exc,
+                )
+
+            if attempt < self.request_retries:
+                sleep_seconds = self.retry_backoff_seconds * attempt
+                time.sleep(sleep_seconds)
+
+        return last_resp
 
     @staticmethod
     def _first_text(soup: BeautifulSoup, selectors: list[str]) -> str:

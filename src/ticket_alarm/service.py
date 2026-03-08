@@ -225,12 +225,3 @@ class TicketAlarmService:
 
         return checks
 
-
-
-    # Backward-compatible aliases
-    def run_daily_registration_check(self) -> None:
-        self.run_new_show_alert_check()
-
-    def run_reminder_check(self) -> None:
-        self.run_preopen_alert_check()
-
