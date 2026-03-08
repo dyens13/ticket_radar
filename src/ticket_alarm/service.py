@@ -133,13 +133,13 @@ class TicketAlarmService:
         return None
 
     def _filter_by_keywords(self, events):
-        keywords = [k.lower() for k in self.config.keywords]
+        keywords = [k.casefold() for k in self.config.keywords]
         if not keywords:
             return events
 
         matched = []
         for event in events:
-            hay = f"{event.title} {event.venue}".lower()
+            hay = f"{event.title} {event.venue}".casefold()
             if any(k in hay for k in keywords):
                 matched.append(event)
         return matched
@@ -224,3 +224,4 @@ class TicketAlarmService:
             )
 
         return checks
+

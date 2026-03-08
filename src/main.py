@@ -3,7 +3,7 @@
 import argparse
 import logging
 
-from ticker_alarm import TicketAlarmService, load_config
+from ticket_alarm import TicketAlarmService, load_config
 
 
 def main() -> None:
@@ -37,3 +37,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

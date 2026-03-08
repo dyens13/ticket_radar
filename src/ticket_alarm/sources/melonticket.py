@@ -14,9 +14,12 @@ from .parsing import parse_korean_datetime
 class MelonTicketAdapter(SourceAdapter):
     LIST_URL = "https://ticket.melon.com/csoon/index.htm"
     LIST_AJAX_URL = "https://ticket.melon.com/csoon/ajax/listTicketOpen.htm"
+    PERFORMANCE_URL = "https://ticket.melon.com/performance/index.htm?prodId={prod_id}"
+
     DATE_PREFIX_RE = re.compile(r"^\[오픈\]\s*\d{2}\.\d{2}\.\d{2}\([^)]*\)\s*")
     DATE_SUFFIX_RE = re.compile(r"\s*\[오픈\]\s*\d{2}\.\d{2}\.\d{2}\([^)]*\)\s*$")
     SCHEDULE_SUFFIX_RE = re.compile(r"\s*오픈일정\s*보기\s*>\s*$")
+    PROD_ID_RE = re.compile(r"bannerLanding\(\s*['\"]TD['\"]\s*,\s*['\"](\d+)['\"]\s*\)")
 
     def __init__(self, timezone_name: str, source_cfg: dict | None = None):
         self.timezone_name = timezone_name
@@ -27,6 +30,7 @@ class MelonTicketAdapter(SourceAdapter):
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
         )
+        self._venue_cache: dict[str, str] = {}
 
     def fetch_events(self) -> list[ShowEvent]:
         max_pages = int(self.source_cfg.get("max_pages", 10))
@@ -56,9 +60,10 @@ class MelonTicketAdapter(SourceAdapter):
                     continue
                 seen_links.add(full_link)
 
-                detail_text = self._fetch_detail_text(full_link)
+                detail_text, prod_id = self._fetch_detail_text_and_prod_id(full_link)
                 open_at = parse_korean_datetime(detail_text or raw_title, self.timezone_name)
                 title = self._normalize_title(raw_title)
+                venue = self._fetch_venue_by_prod_id(prod_id) if prod_id else ""
                 if not title:
                     continue
 
@@ -68,6 +73,7 @@ class MelonTicketAdapter(SourceAdapter):
                         title=title,
                         link=full_link,
                         booking_open_at=open_at,
+                        venue=venue,
                     )
                 )
                 page_added += 1
@@ -123,14 +129,57 @@ class MelonTicketAdapter(SourceAdapter):
             return ""
         return resp.text
 
-    def _fetch_detail_text(self, detail_url: str) -> str:
+    def _fetch_detail_text_and_prod_id(self, detail_url: str) -> tuple[str, str | None]:
         try:
             resp = self.session.get(detail_url, timeout=20)
             resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "html.parser")
-            return soup.get_text(" ", strip=True)
+            html = resp.text
+            soup = BeautifulSoup(html, "html.parser")
+            text = soup.get_text(" ", strip=True)
+
+            m = self.PROD_ID_RE.search(html)
+            prod_id = m.group(1) if m else None
+            return text, prod_id
         except Exception:
-            return ""
+            return "", None
+
+    def _fetch_venue_by_prod_id(self, prod_id: str) -> str:
+        if prod_id in self._venue_cache:
+            return self._venue_cache[prod_id]
+
+        venue = ""
+        try:
+            url = self.PERFORMANCE_URL.format(prod_id=prod_id)
+            resp = self.session.get(url, timeout=20)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            place = self._clean_text(self._first_text(soup, ["span.place", "p.place", "li.place"]))
+            location = self._clean_text(self._first_text(soup, ["span.location", "p.location", "li.location"]))
+
+            if place and location and location not in place:
+                venue = f"{place} ({location})"
+            else:
+                venue = place or location
+        except Exception:
+            venue = ""
+
+        self._venue_cache[prod_id] = venue
+        return venue
+
+    @staticmethod
+    def _first_text(soup: BeautifulSoup, selectors: list[str]) -> str:
+        for sel in selectors:
+            el = soup.select_one(sel)
+            if el:
+                txt = el.get_text(" ", strip=True)
+                if txt:
+                    return txt
+        return ""
+
+    @staticmethod
+    def _clean_text(text: str) -> str:
+        return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
 
     def _normalize_title(self, raw_title: str) -> str:
         title = self.DATE_PREFIX_RE.sub("", raw_title)
