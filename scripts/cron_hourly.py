@@ -16,6 +16,16 @@ LOG_FILE_RELATIVE = "logs/cron_hourly.log"
 MODES = ["new-alert-once", "preopen-alert-once"]
 
 
+def _reset_log_if_new_day(log_file: Path) -> None:
+    if not log_file.exists():
+        return
+
+    last_modified = datetime.fromtimestamp(log_file.stat().st_mtime).date()
+    today = datetime.now().date()
+    if last_modified != today:
+        log_file.unlink(missing_ok=True)
+
+
 def _write_log(log_file: Path, message: str) -> None:
     stamped = f"[{datetime.now().isoformat()}] {message}"
     print(stamped)
@@ -48,6 +58,8 @@ def main() -> int:
     config_path = root / "config.yaml"
     log_file = root / LOG_FILE_RELATIVE
     log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    _reset_log_if_new_day(log_file)
 
     _write_log(log_file, f"running modes: {', '.join(MODES)}")
     for mode in MODES:

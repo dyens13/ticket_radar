@@ -74,7 +74,7 @@ cron은 실행 시각만 결정합니다.
 - `preopen-alert-once`
 
 - 스크립트: `scripts/cron_hourly.py`
-- 로그: `logs/cron_hourly.log` (스크립트 내부에서 누적 기록)
+- 로그: `logs/cron_hourly.log` (같은 날에는 누적, 날짜가 바뀌면 파일 삭제 후 새로 시작)
 
 ### 1) 서버 파이썬 경로 설정
 `scripts/cron_hourly.py`의 아래 상수를 서버 환경에 맞게 수정:
@@ -106,3 +106,4 @@ TARGET_PYTHON = "/usr/bin/python3"
 ## 주의
 - 사이트 DOM/API 변경 시 파서 업데이트 필요
 - 사이트 이용약관/robots 정책 확인 후 사용
+
