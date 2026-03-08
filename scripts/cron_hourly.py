@@ -7,7 +7,7 @@ from pathlib import Path
 
 # Set the interpreter that should run src/main.py.
 # Change this path to match your server environment.
-TARGET_PYTHON = "/usr/bin/python3"
+TARGET_PYTHON = '/home/azureuser/miniconda3/envs/py311/bin/python'
 
 # Fixed policy: run both jobs when minute == 00.
 TOP_OF_HOUR_MINUTE = 0
