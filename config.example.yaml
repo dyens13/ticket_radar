@@ -42,3 +42,6 @@ sources:
   - type: "melonticket"
     enabled: true
     url: "https://ticket.melon.com/csoon/index.htm"
+    max_pages: 10
+    request_retries: 3
+    retry_backoff_seconds: 2.0
