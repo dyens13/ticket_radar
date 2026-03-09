@@ -1,6 +1,7 @@
 ﻿#!/usr/bin/env python
 from __future__ import annotations
 
+import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -32,11 +33,19 @@ def _write_log(log_file: Path, message: str) -> None:
         f.write(stamped + "\n")
 
 
-def _run_mode(py: str, main_script: Path, config_path: Path, mode: str, log_file: Path) -> None:
+def _run_mode(py: str, main_script: Path, config_path: Path, mode: str, log_file: Path, root: Path) -> None:
     cmd = [py, str(main_script), "--config", str(config_path), "--mode", mode]
     _write_log(log_file, f"start mode={mode} cmd={' '.join(cmd)}")
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    kwargs = {
+        "capture_output": True,
+        "text": True,
+        "cwd": str(root),
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    result = subprocess.run(cmd, **kwargs)
 
     if result.stdout:
         for line in result.stdout.splitlines():
@@ -53,6 +62,10 @@ def _run_mode(py: str, main_script: Path, config_path: Path, mode: str, log_file
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
+
+    # Ensure relative paths in config (e.g. ./data/state.yaml) resolve under repo root.
+    os.chdir(root)
+
     main_script = root / "src" / "main.py"
     config_path = root / "config.yaml"
     log_file = root / LOG_FILE_RELATIVE
@@ -62,7 +75,7 @@ def main() -> int:
 
     _write_log(log_file, f"running modes: {', '.join(MODES)}")
     for mode in MODES:
-        _run_mode(TARGET_PYTHON, main_script, config_path, mode, log_file)
+        _run_mode(TARGET_PYTHON, main_script, config_path, mode, log_file, root)
 
     return 0
 

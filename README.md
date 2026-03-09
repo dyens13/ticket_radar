@@ -66,7 +66,7 @@ python src/main.py --config config.yaml --mode new-alert-once
 python src/main.py --config config.yaml --mode preopen-alert-once
 ```
 
-## cron 운영 (권장)
+## cron 운영 (Linux)
 
 cron은 실행 시각만 결정합니다.
 스크립트는 실행될 때마다 항상 아래 두 작업을 순서대로 모두 수행합니다.
@@ -92,21 +92,6 @@ TARGET_PYTHON = "/usr/bin/python3"
 # 30 * * * * cd /path/to/ticket_radar && python scripts/cron_hourly.py
 ```
 
-## 알림 규칙
-- 신규 등록 알림: 키워드 매칭 + 신규 fingerprint만 전송
-- 리마인더 알림
-  - 전날 지정 시각
-  - 당일 아침 지정 시각
-  - 1시간 전
-- 모든 알림은 중복 전송 방지
-
-## 패키지명
-코드 패키지명은 `ticket_alarm`입니다.
-
-## 주의
-- 사이트 DOM/API 변경 시 파서 업데이트 필요
-- 사이트 이용약관/robots 정책 확인 후 사용
-
 ## Windows 스케줄러 (`schtasks`) 운영
 
 윈도우에서는 `scripts/hourly_windows.py`를 작업 스케줄러로 실행하면 됩니다.
@@ -114,14 +99,18 @@ TARGET_PYTHON = "/usr/bin/python3"
 - `new-alert-once`
 - `preopen-alert-once`
 
+`hourly_windows.py`는 내부에서 프로젝트 루트로 `chdir`하므로,
+작업 스케줄러 시작 경로가 달라도 `./data/state.yaml` 경로가 깨지지 않습니다.
+
 ### 기본 변수
 - 작업 이름: `ticket_radar_hourly`
-- 실행 파일: `C:\miniconda3\envs\py311\python.exe`
+- 실행 파일(권장): `C:\miniconda3\envs\py311\pythonw.exe` (콘솔 창 안 뜸)
 - 스크립트: `D:\Research\ticket_radar\scripts\hourly_windows.py`
+- 로그: `logs/hourly_windows.log` (같은 날 누적, 날짜 바뀌면 자동 초기화)
 
 ### 1) 작업 등록 (매시간 00분)
 ```powershell
-schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\python.exe D:\Research\ticket_radar\scripts\hourly_windows.py" /SC HOURLY /MO 1 /ST 00:00 /F
+schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\pythonw.exe D:\Research\ticket_radar\scripts\hourly_windows.py" /SC HOURLY /MO 1 /ST 00:00 /F
 ```
 
 ### 2) 작업 즉시 실행
@@ -146,13 +135,13 @@ schtasks /Delete /TN "ticket_radar_hourly" /F
 - 예: 매시 30분으로 변경
 ```powershell
 schtasks /Delete /TN "ticket_radar_hourly" /F
-schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\python.exe D:\Research\ticket_radar\scripts\hourly_windows.py" /SC HOURLY /MO 1 /ST 00:30 /F
+schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\pythonw.exe D:\Research\ticket_radar\scripts\hourly_windows.py" /SC HOURLY /MO 1 /ST 00:30 /F
 ```
 
 - 예: 2시간마다 15분에 실행
 ```powershell
 schtasks /Delete /TN "ticket_radar_hourly" /F
-schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\python.exe D:\Research\ticket_radar\scripts\hourly_windows.py" /SC HOURLY /MO 2 /ST 00:15 /F
+schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\pythonw.exe D:\Research\ticket_radar\scripts\hourly_windows.py" /SC HOURLY /MO 2 /ST 00:15 /F
 ```
 
 ### 6) 로그 확인
@@ -160,3 +149,17 @@ schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\python.
 Get-Content D:\Research\ticket_radar\logs\hourly_windows.log
 ```
 
+## 알림 규칙
+- 신규 등록 알림: 키워드 매칭 + 신규 fingerprint만 전송
+- 리마인더 알림
+  - 전날 지정 시각
+  - 당일 아침 지정 시각
+  - 1시간 전
+- 모든 알림은 중복 전송 방지
+
+## 패키지명
+코드 패키지명은 `ticket_alarm`입니다.
+
+## 주의
+- 사이트 DOM/API 변경 시 파서 업데이트 필요
+- 사이트 이용약관/robots 정책 확인 후 사용
