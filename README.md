@@ -121,7 +121,7 @@ TARGET_PYTHON = "/usr/bin/python3"
 
 ### 1) 작업 등록 (매시간 00분)
 ```powershell
-schtasks /Create /TN "ticket_radar_hourly" /TR "\"C:\miniconda3\envs\py311\python.exe\" \"D:\Research\ticket_radar\scripts\hourly_windows.py\"" /SC HOURLY /MO 1 /ST 00:00 /F
+schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\python.exe D:\Research\ticket_radar\scripts\hourly_windows.py" /SC HOURLY /MO 1 /ST 00:00 /F
 ```
 
 ### 2) 작업 즉시 실행
@@ -146,16 +146,17 @@ schtasks /Delete /TN "ticket_radar_hourly" /F
 - 예: 매시 30분으로 변경
 ```powershell
 schtasks /Delete /TN "ticket_radar_hourly" /F
-schtasks /Create /TN "ticket_radar_hourly" /TR "\"C:\miniconda3\envs\py311\python.exe\" \"D:\Research\ticket_radar\scripts\hourly_windows.py\"" /SC HOURLY /MO 1 /ST 00:30 /F
+schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\python.exe D:\Research\ticket_radar\scripts\hourly_windows.py" /SC HOURLY /MO 1 /ST 00:30 /F
 ```
 
 - 예: 2시간마다 15분에 실행
 ```powershell
 schtasks /Delete /TN "ticket_radar_hourly" /F
-schtasks /Create /TN "ticket_radar_hourly" /TR "\"C:\miniconda3\envs\py311\python.exe\" \"D:\Research\ticket_radar\scripts\hourly_windows.py\"" /SC HOURLY /MO 2 /ST 00:15 /F
+schtasks /Create /TN "ticket_radar_hourly" /TR "C:\miniconda3\envs\py311\python.exe D:\Research\ticket_radar\scripts\hourly_windows.py" /SC HOURLY /MO 2 /ST 00:15 /F
 ```
 
 ### 6) 로그 확인
 ```powershell
 Get-Content D:\Research\ticket_radar\logs\hourly_windows.log
 ```
+
