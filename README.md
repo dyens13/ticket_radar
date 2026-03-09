@@ -107,3 +107,55 @@ TARGET_PYTHON = "/usr/bin/python3"
 - 사이트 DOM/API 변경 시 파서 업데이트 필요
 - 사이트 이용약관/robots 정책 확인 후 사용
 
+## Windows 스케줄러 (`schtasks`) 운영
+
+윈도우에서는 `scripts/hourly_windows.py`를 작업 스케줄러로 실행하면 됩니다.
+스크립트는 실행될 때마다 아래 2개를 순서대로 실행합니다.
+- `new-alert-once`
+- `preopen-alert-once`
+
+### 기본 변수
+- 작업 이름: `ticket_radar_hourly`
+- 실행 파일: `C:\miniconda3\envs\py311\python.exe`
+- 스크립트: `D:\Research\ticket_radar\scripts\hourly_windows.py`
+
+### 1) 작업 등록 (매시간 00분)
+```powershell
+schtasks /Create /TN "ticket_radar_hourly" /TR "\"C:\miniconda3\envs\py311\python.exe\" \"D:\Research\ticket_radar\scripts\hourly_windows.py\"" /SC HOURLY /MO 1 /ST 00:00 /F
+```
+
+### 2) 작업 즉시 실행
+```powershell
+schtasks /Run /TN "ticket_radar_hourly"
+```
+
+### 3) 작업 상태/설정 조회
+```powershell
+schtasks /Query /TN "ticket_radar_hourly" /V /FO LIST
+```
+
+### 4) 작업 삭제
+```powershell
+schtasks /Delete /TN "ticket_radar_hourly" /F
+```
+
+### 5) 시간/주기 변경
+`schtasks /Change`는 변경 가능한 항목이 제한적이라,
+실무에서는 **삭제 후 재등록**이 가장 확실합니다.
+
+- 예: 매시 30분으로 변경
+```powershell
+schtasks /Delete /TN "ticket_radar_hourly" /F
+schtasks /Create /TN "ticket_radar_hourly" /TR "\"C:\miniconda3\envs\py311\python.exe\" \"D:\Research\ticket_radar\scripts\hourly_windows.py\"" /SC HOURLY /MO 1 /ST 00:30 /F
+```
+
+- 예: 2시간마다 15분에 실행
+```powershell
+schtasks /Delete /TN "ticket_radar_hourly" /F
+schtasks /Create /TN "ticket_radar_hourly" /TR "\"C:\miniconda3\envs\py311\python.exe\" \"D:\Research\ticket_radar\scripts\hourly_windows.py\"" /SC HOURLY /MO 2 /ST 00:15 /F
+```
+
+### 6) 로그 확인
+```powershell
+Get-Content D:\Research\ticket_radar\logs\hourly_windows.log
+```
