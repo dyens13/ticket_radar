@@ -71,7 +71,14 @@ class MelonTicketAdapter(SourceAdapter):
                 seen_links.add(full_link)
 
                 detail_text, prod_id = self._fetch_detail_text_and_prod_id(full_link)
-                open_at = parse_korean_datetime(detail_text or raw_title, self.timezone_name)
+
+                open_at_text = self._extract_open_time_text(link)
+                if open_at_text:
+                    # Use explicit list "ticket open time" first; avoid picking detail-page registration date.
+                    open_at = parse_korean_datetime(open_at_text, self.timezone_name)
+                else:
+                    open_at = parse_korean_datetime(detail_text or raw_title, self.timezone_name)
+
                 title = self._normalize_title(raw_title)
                 venue = self._fetch_venue_by_prod_id(prod_id) if prod_id else ""
                 if not title:
@@ -156,6 +163,19 @@ class MelonTicketAdapter(SourceAdapter):
             return ""
         return resp.text
 
+
+    def _extract_open_time_text(self, link_tag) -> str:
+        row = link_tag.find_parent("li")
+        if row is None:
+            return ""
+
+        date_el = row.select_one("div.ticket_data span.date")
+        if date_el is None:
+            date_el = row.select_one("span.date")
+        if date_el is None:
+            return ""
+
+        return self._clean_text(date_el.get_text(" ", strip=True))
     def _fetch_detail_text_and_prod_id(self, detail_url: str) -> tuple[str, str | None]:
         try:
             resp = self._request_with_retries("GET", detail_url, timeout=20)
@@ -256,3 +276,4 @@ class MelonTicketAdapter(SourceAdapter):
     def _to_page_index(page_no: int) -> int:
         # Melon pagination uses goPage("1"), goPage("11"), goPage("21")...
         return 1 + (page_no - 1) * 10
+
